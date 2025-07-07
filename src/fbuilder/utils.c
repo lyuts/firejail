@@ -20,34 +20,7 @@
 
 #include "fbuilder.h"
 
-// todo: duplicated from src/firejail/util.c - remove dplication
-// return 1 if the file is a directory
-int is_dir(const char *fname) {
-	assert(fname);
-	if (*fname == '\0')
-		return 0;
-
-	// if fname doesn't end in '/', add one
-	int rv;
-	struct stat s;
-	if (fname[strlen(fname) - 1] == '/')
-		rv = stat(fname, &s);
-	else {
-		char *tmp;
-		if (asprintf(&tmp, "%s/", fname) == -1)
-			errExit("asprintf");
-		rv = stat(tmp, &s);
-		free(tmp);
-	}
-
-	if (rv == -1)
-		return 0;
-
-	if (S_ISDIR(s.st_mode))
-		return 1;
-
-	return 0;
-}
+extern int is_dir(const char *fname); //
 
 // return NULL if fname is already a directory, or if no directory found
 char *extract_dir(char *fname) {

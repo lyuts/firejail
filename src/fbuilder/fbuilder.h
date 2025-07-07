@@ -56,7 +56,6 @@ void build_bin(const char *fname, FILE *fp);
 void build_home(const char *fname, FILE *fp);
 
 // utils.c
-int is_dir(const char *fname);
 char *extract_dir(char *fname);
 
 // filedb.c

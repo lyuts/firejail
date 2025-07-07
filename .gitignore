@@ -64,3 +64,4 @@ __pycache__
 src/fnettrace/static-ip-map
 src/man/*.1
 src/man/*.5
+src/**/target
