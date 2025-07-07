@@ -1,5 +1,8 @@
 # Firejail
 
+> :warning: **Note**: This branch is just an experiment. Its main purpose is to try out gradual migration of a project to Rust, and not to rewrite firejail to Rust.
+
+
 [![Build (GitLab)](https://gitlab.com/Firejail/firejail_ci/badges/master/pipeline.svg)](https://gitlab.com/Firejail/firejail_ci/pipelines)
 [![Build (GitHub)](https://github.com/netblue30/firejail/workflows/Build/badge.svg)](https://github.com/netblue30/firejail/actions?query=workflow%3ABuild)
 [![Build-extra](https://github.com/netblue30/firejail/workflows/Build-extra/badge.svg)](https://github.com/netblue30/firejail/actions?query=workflow%3ABuild-extra)
