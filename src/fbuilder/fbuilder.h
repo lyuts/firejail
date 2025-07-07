@@ -55,9 +55,6 @@ void build_bin(const char *fname, FILE *fp);
 // build_home.c
 void build_home(const char *fname, FILE *fp);
 
-// utils.c
-char *extract_dir(char *fname);
-
 // filedb.c
 typedef struct filedb_t {
 	struct filedb_t *next;

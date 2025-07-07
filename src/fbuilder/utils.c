@@ -20,24 +20,5 @@
 
 #include "fbuilder.h"
 
-extern int is_dir(const char *fname); //
-
-// return NULL if fname is already a directory, or if no directory found
-char *extract_dir(char *fname) {
-	assert(fname);
-	if (is_dir(fname))
-		return NULL;
-
-	char *name = strdup(fname);
-	if (!name)
-		errExit("strdup");
-
-	char *ptr = strrchr(name, '/');
-	if (!ptr) {
-		free(name);
-		return NULL;
-	}
-	*ptr = '\0';
-
-	return name;
-}
+extern int is_dir(const char *fname);
+extern char *extract_dir(char *fname);
