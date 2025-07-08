@@ -20,5 +20,5 @@
 
 #include "fbuilder.h"
 
-extern int is_dir(const char *fname);
-extern char *extract_dir(char *fname);
+/* extern int is_dir(const char *fname); */
+/* extern char *extract_dir(char *fname); */

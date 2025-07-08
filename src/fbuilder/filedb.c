@@ -20,37 +20,6 @@
 
 #include "fbuilder.h"
 
-// find exact name or an exact name in a parent directory
-FileDB *filedb_find(FileDB *head, const char *fname) {
-	assert(fname);
-	FileDB *ptr = head;
-	int found = 0;
-
-	while (ptr) {
-		// ptr->fname can be a pattern, like .mutter-Xwaylandauth.*
-		// check if fname is a match
-		if (fnmatch(ptr->fname, fname, FNM_PATHNAME) == 0) {
-			found = 1;
-			break;
-		}
-
-		// parent directory in the list
-		if (strlen(fname) > ptr->len &&
-		    fname[ptr->len] == '/' &&
-		    strncmp(ptr->fname, fname, ptr->len) == 0) {
-			found = 1;
-			break;
-		}
-
-		ptr = ptr->next;
-	}
-
-	if (found)
-		return ptr;
-
-	return NULL;
-}
-
 FileDB *filedb_add(FileDB *head, const char *fname) {
 	assert(fname);
 
@@ -71,19 +40,19 @@ FileDB *filedb_add(FileDB *head, const char *fname) {
 	return entry;
 };
 
-void filedb_print(FileDB *head, const char *prefix, FILE *fp) {
-	assert(head);
-	assert(prefix);
+/* void filedb_print(FileDB *head, const char *prefix, FILE *fp) { */
+/* 	assert(head); */
+/* 	assert(prefix); */
 
-	FileDB *ptr = head;
-	while (ptr) {
-		if (fp)
-			fprintf(fp, "%s%s\n", prefix, ptr->fname);
-		else
-			printf("%s%s\n", prefix, ptr->fname);
-		ptr = ptr->next;
-	}
-}
+/* 	FileDB *ptr = head; */
+/* 	while (ptr) { */
+/* 		if (fp) */
+/* 			fprintf(fp, "%s%s\n", prefix, ptr->fname); */
+/* 		else */
+/* 			printf("%s%s\n", prefix, ptr->fname); */
+/* 		ptr = ptr->next; */
+/* 	} */
+/* } */
 
 FileDB *filedb_load_whitelist(FileDB *head, const char *fname, const char *prefix) {
 	assert(fname);
