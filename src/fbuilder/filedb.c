@@ -40,20 +40,6 @@ FileDB *filedb_add(FileDB *head, const char *fname) {
 	return entry;
 };
 
-/* void filedb_print(FileDB *head, const char *prefix, FILE *fp) { */
-/* 	assert(head); */
-/* 	assert(prefix); */
-
-/* 	FileDB *ptr = head; */
-/* 	while (ptr) { */
-/* 		if (fp) */
-/* 			fprintf(fp, "%s%s\n", prefix, ptr->fname); */
-/* 		else */
-/* 			printf("%s%s\n", prefix, ptr->fname); */
-/* 		ptr = ptr->next; */
-/* 	} */
-/* } */
-
 FileDB *filedb_load_whitelist(FileDB *head, const char *fname, const char *prefix) {
 	assert(fname);
 	assert(prefix);
