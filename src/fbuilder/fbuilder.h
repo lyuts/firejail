@@ -62,7 +62,6 @@ typedef struct filedb_t {
 	unsigned len;	// length of file name
 } FileDB;
 
-FileDB *filedb_add(FileDB *head, const char *fname);
 FileDB *filedb_load_whitelist(FileDB *head, const char *fname, const char *prefix);
 
 #endif
