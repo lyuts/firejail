@@ -85,7 +85,9 @@ static void process_bin(const char *fname) {
 
 		// skip strace and firejail (in case we hit a symlink in /usr/local/bin)
 		if (strcmp(ptr, "strace") && strcmp(ptr, "firejail"))
+            printf("[DBG] bin_out was %p ", bin_out);
 			bin_out = filedb_add(bin_out, ptr);
+            printf(" now %p after adding %s\n", bin_out, ptr);
 	}
 
 	fclose(fp);
@@ -112,12 +114,9 @@ void build_bin(const char *fname, FILE *fp) {
 	}
 
 	if (bin_out) {
+        printf("[DBG] BINOUT:\n");
 		fprintf(fp, "private-bin ");
-		FileDB *ptr = bin_out;
-		while (ptr) {
-			fprintf(fp, "%s,", ptr->fname);
-			ptr = ptr->next;
-		}
+        write_filedb_to_file_as_line(bin_out, ",", fp);
 		fprintf(fp, "\n");
 	}
 }

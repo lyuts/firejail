@@ -171,7 +171,7 @@ void build_home(const char *fname, FILE *fp) {
 
 	// print the out list if any
 	if (db_out) {
-		filedb_print(db_out, "whitelist ${HOME}/", fp);
+		write_filedb_to_file_lines(db_out, "whitelist ${HOME}/", fp);
 		fprintf(fp, "include whitelist-common.inc\n");
 	}
 	else

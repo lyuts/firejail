@@ -60,11 +60,16 @@ SYNTAX_FILES := $(SYNTAX_FILES_IN:.in=)
 ALL_ITEMS = $(APPS) $(SBOX_APPS) $(SBOX_APPS_NON_DUMPABLE) $(MYLIBS)
 
 .PHONY: all
-all: all_items mydirs filters $(MAN_TARGET) $(CONTRIB_TARGET)
+all: rust_items all_items mydirs filters $(MAN_TARGET) $(CONTRIB_TARGET)
 
 config.mk config.sh:
 	@printf 'error: run ./configure to generate %s\n' "$@" >&2
 	@false
+
+.PHONY: rust_items
+rust_items:
+	cargo build --manifest-path src/fbuilder_rs/Cargo.toml
+	touch src/fbuilder/fbuilder.h
 
 .PHONY: all_items
 all_items: $(ALL_ITEMS)

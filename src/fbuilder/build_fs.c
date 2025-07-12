@@ -160,12 +160,7 @@ void build_etc(const char *fname, FILE *fp) {
 	if (etc_out == NULL)
 		fprintf(fp, "none\n");
 	else {
-		FileDB *ptr = etc_out;
-		while (ptr) {
-			fprintf(fp, "%s,", ptr->fname);
-			ptr = ptr->next;
-		}
-		fprintf(fp, "\n");
+        write_filedb_to_file_as_line(etc_out, ",", fp);
 	}
 }
 
@@ -368,12 +363,7 @@ void build_tmp(const char *fname, FILE *fp) {
 		fprintf(fp, "#private-tmp\n");
 		fprintf(fp, "# File accessed in /tmp directory:\n");
 		fprintf(fp, "# ");
-		FileDB *ptr = tmp_out;
-		while (ptr) {
-			fprintf(fp, "%s,", ptr->fname);
-			ptr = ptr->next;
-		}
-		printf("\n");
+        write_filedb_to_file_as_line(tmp_out, ",", fp);
 	}
 }
 
@@ -443,11 +433,6 @@ void build_dev(const char *fname, FILE *fp) {
 		fprintf(fp, "#private-dev\n");
 		fprintf(fp, "# This is the list of devices accessed on top of regular private-dev devices:\n");
 		fprintf(fp, "# ");
-		FileDB *ptr = dev_out;
-		while (ptr) {
-			fprintf(fp, "%s,", ptr->fname);
-			ptr = ptr->next;
-		}
-		fprintf(fp, "\n");
+        write_filedb_to_file_as_line(dev_out, ",", fp);
 	}
 }

@@ -1,12 +1,23 @@
+use lazy_static::lazy_static;
 use std::{
+    collections::HashMap,
     ffi::{CStr, CString},
     fs::File,
     io::{BufRead, BufReader},
+    sync::Mutex,
 };
 
 // todo: figure out how to get this from a configure-like step at build time.
 const SYSCONFDIR: &str = "/etc/firejail";
 
+lazy_static! {
+    static ref FILEDBS: Mutex<HashMap<libc::uintptr_t, Vec<String>>> = {
+        let m = HashMap::new();
+        Mutex::new(m)
+    };
+}
+
+#[repr(C)]
 pub struct FileDB {
     next: *const FileDB,
     fname: *const libc::c_char, // file name
@@ -37,7 +48,8 @@ pub extern "C" fn filedb_load_whitelist(
             let line = line.expect("Must be valid line.");
 
             if line.starts_with(prefix_str) {
-                curr = filedb_add(curr, CString::new(line).unwrap().into_raw());
+                // we don't do into_raw because filedb_add is already in rust
+                curr = filedb_add(curr, CString::new(line).unwrap().as_ptr());
             }
         }
 
@@ -49,31 +61,46 @@ pub extern "C" fn filedb_load_whitelist(
 pub extern "C" fn filedb_add(head: *const FileDB, fname: *const libc::c_char) -> *const FileDB {
     assert!(fname != std::ptr::null());
 
-    // don't add it if it is already there or if the parent directory is already in the list
-    if filedb_find(head, fname) != std::ptr::null() {
-        return head;
+    let mut dbs = FILEDBS.lock().unwrap();
+    let mut new_head = head;
+    if !dbs.contains_key(&(head as libc::uintptr_t)) {
+        unsafe {
+            new_head = libc::malloc(size_of::<FileDB>()) as *mut FileDB;
+            dbs.insert(new_head as libc::uintptr_t, vec![]);
+        }
     }
 
     unsafe {
-        // add a new entry
-        let entry: *mut FileDB = libc::malloc(size_of::<FileDB>()) as *mut FileDB;
-        if entry == std::ptr::null_mut() {
-            panic!("malloc");
+        let rust_fname = CString::new(CStr::from_ptr(fname).to_bytes())
+            .unwrap()
+            .into_string()
+            .unwrap();
+
+        if dbs
+            .get(&(new_head as libc::uintptr_t))
+            .unwrap()
+            .contains(&rust_fname)
+        {
+            return head;
         }
-        libc::memset(entry as *mut libc::c_void, 0, std::mem::size_of::<FileDB>());
-        (*entry).fname = libc::strdup(fname);
-        if (*entry).fname == std::ptr::null() {
-            panic!("strdup");
-        }
-        (*entry).len = libc::strlen((*entry).fname);
-        (*entry).next = head;
-        return entry;
+
+        // why not push? to preserve the behavior of the original file db implementation.
+        dbs.get_mut(&(new_head as libc::uintptr_t))
+            .unwrap()
+            .insert(0, rust_fname);
+
+        // println!("DBG DB[{:x?}].vec = {:?}", new_head, dbs.get(&(new_head as libc::uintptr_t)).unwrap());
     }
+
+    return new_head;
 }
 
 // find exact name or an exact name in a parent directory
 #[unsafe(no_mangle)]
-pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -> *const FileDB {
+pub extern "C" fn filedb_find_old(
+    head: *const FileDB,
+    fname: *const libc::c_char,
+) -> *const FileDB {
     assert!(fname != std::ptr::null());
 
     let mut ptr: *const FileDB = head;
@@ -85,6 +112,7 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
             let fname_str = CStr::from_ptr(fname).to_str().unwrap();
             // ptr->fname can be a pattern, like .mutter-Xwaylandauth.*
             // check if fname is a match
+
             let re_name =
                 fnmatch_regex::glob_to_regex(ptr_fname_str).expect("Must be valid regex.");
             found = re_name.is_match(fname_str);
@@ -93,7 +121,7 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
             }
 
             // if libc::fnmatch((*ptr).fname, fname, libc::FNM_PATHNAME) == 0 {
-            //     found = 1;
+            //     found = true;
             //     break;
             // }
 
@@ -121,6 +149,56 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -> *const FileDB {
+    assert!(fname != std::ptr::null());
+
+    let mut dbs = FILEDBS.lock().unwrap();
+    if !dbs.contains_key(&(head as libc::uintptr_t)) {
+        return std::ptr::null();
+    }
+    let mut found = false;
+
+    let mut found_str = &String::new();
+
+    for ptr_fname_str in dbs.get(&(head as libc::uintptr_t)).unwrap().iter() {
+        unsafe {
+            let fname_str = CStr::from_ptr(fname).to_str().unwrap();
+            // ptr->fname can be a pattern, like .mutter-Xwaylandauth.*
+            // check if fname is a match
+            let re_name =
+                fnmatch_regex::glob_to_regex(&ptr_fname_str).expect("Must be valid regex.");
+            found = re_name.is_match(fname_str);
+            if found {
+                found_str = ptr_fname_str;
+                println!("filedb_find> fnmatched {} by {}", fname_str, ptr_fname_str);
+                break;
+            }
+
+            // parent directory in the list
+            if fname_str.len() > ptr_fname_str.len()
+            // if libc::strlen(fname) > (*ptr).len
+                && fname_str.ends_with('/')
+                // && (*fname.wrapping_add((*ptr).len) as u8) == b'/'
+                && ptr_fname_str == fname_str
+            // && libc::strncmp((*ptr).fname, fname, (*ptr).len) == 0
+            {
+                found = true;
+                found_str = ptr_fname_str;
+                break;
+            }
+        }
+    }
+
+    if found {
+        // it doesn't matter what pointer we return. C code doesn't use it except for binary
+        // found/didn't find checks.
+        return 0xabcdef as *const FileDB;
+    }
+
+    return std::ptr::null();
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn filedb_print(
     head: *const FileDB,
     prefix: *const libc::c_char,
@@ -134,12 +212,12 @@ pub extern "C" fn filedb_print(
     while ptr != std::ptr::null() {
         if fp != std::ptr::null_mut() {
             unsafe {
-                libc::fprintf(
-                    fp,
-                    CString::new("%s%s\n").unwrap().as_ptr(),
-                    prefix,
-                    (*ptr).fname,
+                println!(
+                    "{}{}\n",
+                    CStr::from_ptr(prefix).to_str().unwrap(),
+                    CStr::from_ptr((*ptr).fname).to_str().unwrap()
                 );
+                libc::fprintf(fp, c"%s%s\n".as_ptr(), prefix, (*ptr).fname);
             }
         } else {
             unsafe {
@@ -152,6 +230,55 @@ pub extern "C" fn filedb_print(
         }
         unsafe {
             ptr = (*ptr).next;
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn write_filedb_to_file_as_line(
+    head: *const FileDB,
+    sep: *const char,
+    fp: *mut libc::FILE,
+) {
+    let mut dbs = FILEDBS.lock().unwrap();
+    if !dbs.contains_key(&(head as libc::uintptr_t)) {
+        return;
+    }
+
+    for ptr_fname_str in dbs.get(&(head as libc::uintptr_t)).unwrap().iter() {
+        unsafe {
+            println!("WRITING {}", ptr_fname_str);
+            libc::fprintf(
+                fp,
+                c"%s%s".as_ptr(),
+                CString::new(ptr_fname_str.as_bytes()).unwrap().into_raw(),
+                sep,
+            );
+            libc::fprintf(fp, c"\n".as_ptr());
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn write_filedb_to_file_lines(
+    head: *const FileDB,
+    prefix: *const char,
+    fp: *mut libc::FILE,
+) {
+    let mut dbs = FILEDBS.lock().unwrap();
+    if !dbs.contains_key(&(head as libc::uintptr_t)) {
+        return;
+    }
+
+    for ptr_fname_str in dbs.get(&(head as libc::uintptr_t)).unwrap().iter() {
+        unsafe {
+            println!("WRITING {}", ptr_fname_str);
+            libc::fprintf(
+                fp,
+                c"%s%s\n".as_ptr(),
+                prefix,
+                CString::new(ptr_fname_str.as_bytes()).unwrap().into_raw(),
+            );
         }
     }
 }
