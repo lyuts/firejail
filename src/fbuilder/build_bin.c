@@ -19,7 +19,7 @@
 */
 #include "fbuilder.h"
 
-static FileDB *bin_out = NULL;
+static FileDB *bin_out = 0x0201;
 
 static void process_bin(const char *fname) {
 	assert(fname);
@@ -86,7 +86,7 @@ static void process_bin(const char *fname) {
 		// skip strace and firejail (in case we hit a symlink in /usr/local/bin)
 		if (strcmp(ptr, "strace") && strcmp(ptr, "firejail"))
             printf("[DBG] bin_out was %p ", bin_out);
-			bin_out = filedb_add(bin_out, ptr);
+			filedb_add(bin_out, ptr);
             printf(" now %p after adding %s\n", bin_out, ptr);
 	}
 
@@ -113,7 +113,7 @@ void build_bin(const char *fname, FILE *fp) {
 		free(newname);
 	}
 
-	if (bin_out) {
+	if (!filedb_is_empty(bin_out)) {
         printf("[DBG] BINOUT:\n");
 		fprintf(fp, "private-bin ");
         write_filedb_to_file_as_line(bin_out, ",", fp);

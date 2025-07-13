@@ -20,8 +20,8 @@
 
 #include "fbuilder.h"
 
-static FileDB *db_skip = NULL;
-static FileDB *db_out = NULL;
+static FileDB *db_skip = 0x0301;
+static FileDB *db_out = 0x0302;
 
 void process_home(const char *fname, char *home, int home_len) {
 	assert(fname);
@@ -129,7 +129,7 @@ void process_home(const char *fname, char *home, int home_len) {
 		}
 
 		// add the file to out list
-		db_out = filedb_add(db_out, toadd);
+		filedb_add(db_out, toadd);
 		if (dir)
 			free(dir);
 
@@ -170,7 +170,7 @@ void build_home(const char *fname, FILE *fp) {
 	}
 
 	// print the out list if any
-	if (db_out) {
+	if (!filedb_is_empty(db_out)) {
 		write_filedb_to_file_lines(db_out, "whitelist ${HOME}/", fp);
 		fprintf(fp, "include whitelist-common.inc\n");
 	}

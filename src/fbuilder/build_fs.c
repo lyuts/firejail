@@ -19,6 +19,7 @@
 */
 
 #include "fbuilder.h"
+#include <unistd.h>
 
 // common file processing function, using the callback for each line in the file
 static void process_file(const char *fname, const char *dir, void (*callback)(char *)) {
@@ -125,7 +126,7 @@ static void process_files(const char *fname, const char *dir, void (*callback)(c
 //*******************************************
 // etc directory
 //*******************************************
-static FileDB *etc_out = NULL;
+static FileDB *etc_out = 0x0101;
 
 static void etc_callback(char *ptr) {
 	// skip firejail directory
@@ -148,7 +149,7 @@ static void etc_callback(char *ptr) {
 	char *end = strchr(ptr, '/');
 	if (end)
 		*end = '\0';
-	etc_out = filedb_add(etc_out, ptr);
+	filedb_add(etc_out, ptr);
 }
 
 void build_etc(const char *fname, FILE *fp) {
@@ -157,7 +158,7 @@ void build_etc(const char *fname, FILE *fp) {
 	process_files(fname, "/etc", etc_callback);
 
 	fprintf(fp, "private-etc ");
-	if (etc_out == NULL)
+	if (filedb_is_empty(etc_out))
 		fprintf(fp, "none\n");
 	else {
         write_filedb_to_file_as_line(etc_out, ",", fp);
@@ -181,8 +182,8 @@ static char *var_skip[] = {
 	NULL
 };
 #endif
-static FileDB *var_out = NULL;
-static FileDB *var_skip = NULL;
+static FileDB *var_out = 0x0102;
+static FileDB *var_skip = 0x0103;
 static void var_callback(char *ptr) {
 	// skip /var/lib/flatpak, /var/lib/snapd directory
 	if (strncmp(ptr, "/var/lib/flatpak", 16) == 0 ||
@@ -202,8 +203,7 @@ static void var_callback(char *ptr) {
 		return;
 
 	if (!filedb_find(var_skip, p1))
-		var_out = filedb_add(var_out, p1);
-}
+		filedb_add(var_out, p1); }
 
 void build_var(const char *fname, FILE *fp) {
 	assert(fname);
@@ -212,16 +212,16 @@ void build_var(const char *fname, FILE *fp) {
 	process_files(fname, "/var", var_callback);
 
 	// always whitelist /var
-	if (var_out)
-		filedb_print(var_out, "whitelist /var/", fp);
+	if (!filedb_is_empty(var_out))
+		write_filedb_to_file_lines(var_out, "whitelist /var/", fp);
 	fprintf(fp, "include whitelist-var-common.inc\n");
 }
 
 //*******************************************
 // run directory
 //*******************************************
-static FileDB *run_out = NULL;
-static FileDB *run_skip = NULL;
+static FileDB *run_out = 0x0104;
+static FileDB *run_skip = 0x0105;
 static void run_callback(char *ptr) {
 	// skip /run/firejail
 	if (strncmp(ptr, "/run/firejail", 13) == 0)
@@ -243,7 +243,7 @@ static void run_callback(char *ptr) {
 		return;
 
 	if (!filedb_find(run_skip, p1))
-		run_out = filedb_add(run_out, p1);
+		filedb_add(run_out, p1);
 }
 
 void build_run(const char *fname, FILE *fp) {
@@ -253,8 +253,8 @@ void build_run(const char *fname, FILE *fp) {
 	process_files(fname, "/run", run_callback);
 
 	// always whitelist /run
-	if (run_out)
-		filedb_print(run_out, "whitelist /run/", fp);
+	if (!filedb_is_empty(run_out))
+		write_filedb_to_file_lines(run_out, "whitelist /run/", fp);
 	fprintf(fp, "include whitelist-run-common.inc\n");
 }
 
@@ -262,8 +262,8 @@ void build_run(const char *fname, FILE *fp) {
 // ${RUNUSER} directory
 //*******************************************
 static char *runuser_fname = NULL;
-static FileDB *runuser_out = NULL;
-static FileDB *runuser_skip = NULL;
+static FileDB *runuser_out = 0x0106;
+static FileDB *runuser_skip = 0x0107;
 static void runuser_callback(char *ptr) {
 	// extract the directory:
 	assert(runuser_fname);
@@ -279,7 +279,7 @@ static void runuser_callback(char *ptr) {
 		return;
 
 	if (!filedb_find(runuser_skip, p1))
-		runuser_out = filedb_add(runuser_out, p1);
+		filedb_add(runuser_out, p1);
 }
 
 void build_runuser(const char *fname, FILE *fp) {
@@ -295,16 +295,16 @@ void build_runuser(const char *fname, FILE *fp) {
 	process_files(fname, runuser_fname, runuser_callback);
 
 	// always whitelist /run/user/$UID
-	if (runuser_out)
-		filedb_print(runuser_out, "whitelist ${RUNUSER}/", fp);
+	if (!filedb_is_empty(runuser_out))
+		write_filedb_to_file_lines(runuser_out, "whitelist ${RUNUSER}/", fp);
 	fprintf(fp, "include whitelist-runuser-common.inc\n");
 }
 
 //*******************************************
 // usr/share directory
 //*******************************************
-static FileDB *share_out = NULL;
-static FileDB *share_skip = NULL;
+static FileDB *share_out = 0x0108;
+static FileDB *share_skip = 0x0109;
 static void share_callback(char *ptr) {
 	// extract the directory:
 	assert(strncmp(ptr, "/usr/share", 10) == 0);
@@ -324,7 +324,7 @@ static void share_callback(char *ptr) {
 
 
 	if (!filedb_find(share_skip, p1))
-		share_out = filedb_add(share_out, p1);
+		filedb_add(share_out, p1);
 }
 
 void build_share(const char *fname, FILE *fp) {
@@ -334,22 +334,22 @@ void build_share(const char *fname, FILE *fp) {
 	process_files(fname, "/usr/share", share_callback);
 
 	// always whitelist /usr/share
-	if (share_out)
-		filedb_print(share_out, "whitelist /usr/share/", fp);
+	if (!filedb_is_empty(share_out))
+		write_filedb_to_file_lines(share_out, "whitelist /usr/share/", fp);
 	fprintf(fp, "include whitelist-usr-share-common.inc\n");
 }
 
 //*******************************************
 // tmp directory
 //*******************************************
-static FileDB *tmp_out = NULL;
+static FileDB *tmp_out = 0x010a;
 static void tmp_callback(char *ptr) {
 	if (strncmp(ptr, "/tmp/runtime-", 13) == 0)
 		return;
 	if (strcmp(ptr, "/tmp") == 0)
 		return;
 
-	tmp_out = filedb_add(tmp_out, ptr);
+	filedb_add(tmp_out, ptr);
 }
 
 void build_tmp(const char *fname, FILE *fp) {
@@ -357,7 +357,7 @@ void build_tmp(const char *fname, FILE *fp) {
 
 	process_files(fname, "/tmp", tmp_callback);
 
-	if (tmp_out == NULL)
+	if (filedb_is_empty(tmp_out))
 		fprintf(fp, "private-tmp\n");
 	else {
 		fprintf(fp, "#private-tmp\n");
@@ -406,7 +406,7 @@ static char *dev_skip[] = {
 	NULL
 };
 
-static FileDB *dev_out = NULL;
+static FileDB *dev_out = 0x010b;
 static void dev_callback(char *ptr) {
 	// skip private-dev devices
 	int i = 0;
@@ -419,7 +419,7 @@ static void dev_callback(char *ptr) {
 		i++;
 	}
 	if (!found)
-		dev_out = filedb_add(dev_out, ptr);
+		filedb_add(dev_out, ptr);
 }
 
 void build_dev(const char *fname, FILE *fp) {
@@ -427,7 +427,7 @@ void build_dev(const char *fname, FILE *fp) {
 
 	process_files(fname, "/dev", dev_callback);
 
-	if (dev_out == NULL)
+	if (filedb_is_empty(dev_out))
 		fprintf(fp, "private-dev\n");
 	else {
 		fprintf(fp, "#private-dev\n");

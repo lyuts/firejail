@@ -190,6 +190,7 @@ contrib/syntax/files/%.vim: contrib/syntax/files/%.vim.in $(SYNTAX_LISTS) Makefi
 
 .PHONY: clean
 clean:
+	cargo clean --manifest-path src/fbuilder_rs/Cargo.toml
 	for dir in $$(dirname $(ALL_ITEMS)) $(MYDIRS); do \
 		$(MAKE) -C $$dir clean; \
 	done

@@ -33,7 +33,6 @@ pub extern "C" fn filedb_load_whitelist(
     assert!(fname != std::ptr::null());
     assert!(prefix != std::ptr::null());
 
-    let mut curr: *const FileDB = head;
     unsafe {
         let whitelist_file = File::open(format!(
             "{}/{}",
@@ -49,7 +48,7 @@ pub extern "C" fn filedb_load_whitelist(
 
             if line.starts_with(prefix_str) {
                 // we don't do into_raw because filedb_add is already in rust
-                curr = filedb_add(curr, CString::new(line).unwrap().as_ptr());
+                filedb_add(head, CString::new(line).unwrap().as_ptr());
             }
         }
 
@@ -62,12 +61,8 @@ pub extern "C" fn filedb_add(head: *const FileDB, fname: *const libc::c_char) ->
     assert!(fname != std::ptr::null());
 
     let mut dbs = FILEDBS.lock().unwrap();
-    let mut new_head = head;
     if !dbs.contains_key(&(head as libc::uintptr_t)) {
-        unsafe {
-            new_head = libc::malloc(size_of::<FileDB>()) as *mut FileDB;
-            dbs.insert(new_head as libc::uintptr_t, vec![]);
-        }
+        dbs.insert(head as libc::uintptr_t, vec![]);
     }
 
     unsafe {
@@ -77,7 +72,7 @@ pub extern "C" fn filedb_add(head: *const FileDB, fname: *const libc::c_char) ->
             .unwrap();
 
         if dbs
-            .get(&(new_head as libc::uintptr_t))
+            .get(&(head as libc::uintptr_t))
             .unwrap()
             .contains(&rust_fname)
         {
@@ -85,14 +80,14 @@ pub extern "C" fn filedb_add(head: *const FileDB, fname: *const libc::c_char) ->
         }
 
         // why not push? to preserve the behavior of the original file db implementation.
-        dbs.get_mut(&(new_head as libc::uintptr_t))
+        dbs.get_mut(&(head as libc::uintptr_t))
             .unwrap()
             .insert(0, rust_fname);
 
-        // println!("DBG DB[{:x?}].vec = {:?}", new_head, dbs.get(&(new_head as libc::uintptr_t)).unwrap());
+        // println!("DBG DB[{:x?}].vec = {:?}", head, dbs.get(&(head as libc::uintptr_t)).unwrap());
     }
 
-    return new_head;
+    return head;
 }
 
 // find exact name or an exact name in a parent directory
@@ -240,8 +235,11 @@ pub extern "C" fn write_filedb_to_file_as_line(
     sep: *const char,
     fp: *mut libc::FILE,
 ) {
-    let mut dbs = FILEDBS.lock().unwrap();
+    let dbs = FILEDBS.lock().unwrap();
     if !dbs.contains_key(&(head as libc::uintptr_t)) {
+        unsafe {
+            libc::fprintf(fp, c"\n".as_ptr());
+        }
         return;
     }
 
@@ -254,8 +252,10 @@ pub extern "C" fn write_filedb_to_file_as_line(
                 CString::new(ptr_fname_str.as_bytes()).unwrap().into_raw(),
                 sep,
             );
-            libc::fprintf(fp, c"\n".as_ptr());
         }
+    }
+    unsafe {
+        libc::fprintf(fp, c"\n".as_ptr());
     }
 }
 
@@ -280,6 +280,19 @@ pub extern "C" fn write_filedb_to_file_lines(
                 CString::new(ptr_fname_str.as_bytes()).unwrap().into_raw(),
             );
         }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn filedb_is_empty(head: *const FileDB) -> libc::c_int {
+    let dbs = FILEDBS.lock().unwrap();
+
+    if dbs.contains_key(&(head as libc::uintptr_t))
+        && !dbs.get(&(head as libc::uintptr_t)).unwrap().is_empty()
+    {
+        return 0;
+    } else {
+        return 1;
     }
 }
 
