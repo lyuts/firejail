@@ -91,13 +91,13 @@ pub extern "C" fn process_bin(fname: *const libc::c_char, bin_out: *const FileDB
                 && libc::strcmp(ptr, c"firejail".as_ptr()) != 0
             {
                 print!("[DBG] bin_out was {:x?} ", bin_out);
+                filedb_add(bin_out, ptr);
+                println!(
+                    " now {:x?} after adding {}\n",
+                    bin_out,
+                    CStr::from_ptr(ptr).to_str().unwrap()
+                );
             }
-            filedb_add(bin_out, ptr);
-            println!(
-                " now {:x?} after adding {}\n",
-                bin_out,
-                CStr::from_ptr(ptr).to_str().unwrap()
-            );
         }
 
         libc::fclose(fp);
