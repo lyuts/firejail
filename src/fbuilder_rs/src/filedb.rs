@@ -107,18 +107,10 @@ pub extern "C" fn filedb_find_old(
             let fname_str = CStr::from_ptr(fname).to_str().unwrap();
             // ptr->fname can be a pattern, like .mutter-Xwaylandauth.*
             // check if fname is a match
-
-            let re_name =
-                fnmatch_regex::glob_to_regex(ptr_fname_str).expect("Must be valid regex.");
-            found = re_name.is_match(fname_str);
-            if found {
+            if libc::fnmatch((*ptr).fname, fname, libc::FNM_PATHNAME) == 0 {
+                found = true;
                 break;
             }
-
-            // if libc::fnmatch((*ptr).fname, fname, libc::FNM_PATHNAME) == 0 {
-            //     found = true;
-            //     break;
-            // }
 
             // parent directory in the list
             if fname_str.len() > (*ptr).len
@@ -160,12 +152,14 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
             let fname_str = CStr::from_ptr(fname).to_str().unwrap();
             // ptr->fname can be a pattern, like .mutter-Xwaylandauth.*
             // check if fname is a match
-            let re_name =
-                fnmatch_regex::glob_to_regex(&ptr_fname_str).expect("Must be valid regex.");
-            found = re_name.is_match(fname_str);
-            if found {
+            if libc::fnmatch(
+                CString::new(ptr_fname_str.as_bytes()).unwrap().as_ptr(),
+                fname,
+                libc::FNM_PATHNAME,
+            ) == 0
+            {
+                found = true;
                 found_str = ptr_fname_str;
-                println!("filedb_find> fnmatched {} by {}", fname_str, ptr_fname_str);
                 break;
             }
 
