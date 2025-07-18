@@ -1,4 +1,9 @@
-use std::ffi::CStr;
+use std::{
+    ffi::{CStr, CString},
+    fs::File,
+    io::BufRead,
+    io::BufReader,
+};
 
 use crate::{FileDB, filedb_add};
 
@@ -104,9 +109,98 @@ pub extern "C" fn process_bin(fname: *const libc::c_char, bin_out: *const FileDB
     }
 }
 
-fn process_bin_from_trace_file(fname: *const libc::c_char) -> Vec<String> {
-    vec![]
+///
+/// 4:top:fopen /proc/sys/kernel/osrelease:0x57b4d4d33540
+/// idX : bin_name : syscall file_name : val
+#[derive(Debug, PartialEq)]
+struct Action {
+    idX: u32,
+    bin_name: String,
+    syscall: String,
+    file_name: String,
+    val: Option<i64>,
+}
+
+fn parse_action(line: String) -> Result<Action, ()> {
+    let binding = line.split(':').collect::<Vec<_>>();
+    let [idX, bin_name, syscall_and_file_name, val_str] = binding.as_slice() else {
+        panic!("Invalid contents of the trace file.");
+    };
+
+    let binding = syscall_and_file_name.split(' ').collect::<Vec<_>>();
+    let [syscall, file_name] = binding.as_slice() else {
+        panic!("Invalid contents of the trace file.");
+    };
+
+    let val = i64::from_str_radix(val_str, 10)
+        .or_else(|s| i64::from_str_radix(&val_str[2..], 16))
+        .ok();
+
+    Ok(Action {
+        idX: idX.parse().unwrap(),
+        bin_name: bin_name.to_string(),
+        syscall: syscall.to_string(),
+        file_name: file_name.to_string(),
+        val,
+    })
+}
+
+fn bin_trace_match(action: &Action) -> bool {
+    action.syscall == "exec"
+        && (action.file_name.starts_with("/bin/")
+            || action.file_name.starts_with("/sbin/")
+            || action.file_name.starts_with("/usr/bin/")
+            || action.file_name.starts_with("/usr/sbin/")
+            || action.file_name.starts_with("/usr/local/bin/")
+            || action.file_name.starts_with("/usr/local/sbin/")
+            || action.file_name.starts_with("/usr/games/")
+            || action.file_name.starts_with("/usr/local/games/"))
+        && !action.file_name.ends_with("/strace")
+        && !action.file_name.ends_with("/firejail")
+}
+
+/// Find access to binaries from firejail's trace file.
+fn process_bin_from_trace_file(
+    trace_file_path: &str,
+    trace_match: fn(&Action) -> bool,
+) -> Vec<String> {
+    let trace_file = File::open(trace_file_path).expect("Whitelist file must exist.");
+    let reader = BufReader::new(trace_file);
+    let mut actions = vec![];
+    for line in reader.lines() {
+        let line = line.expect("Must be valid line.");
+        let action = parse_action(line).unwrap();
+        if trace_match(&action) {
+            actions.push(action.file_name);
+        }
+    }
+    actions
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_trace_string_to_action() {
+        let parse_result =
+            parse_action("4:top:fopen /proc/sys/kernel/osrelease:0x57b4d4d33540".to_string());
+        assert!(parse_result.is_ok());
+        assert_eq!(
+            Action {
+                idX: 4,
+                bin_name: "top".to_owned(),
+                syscall: "fopen".to_owned(),
+                file_name: "/proc/sys/kernel/osrelease".to_owned(),
+                val: Some(0x57b4d4d33540),
+            },
+            parse_result.unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_trace_file() {
+        let v = process_bin_from_trace_file("testdata/firejail-trace.ZUVfMS", bin_trace_match);
+        assert_eq!(vec!["/usr/bin/top"], v);
+    }
+}
