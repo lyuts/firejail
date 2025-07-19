@@ -1,8 +1,8 @@
 use std::{
-    ffi::{CStr, CString},
+    ffi::{CStr, CString, OsStr},
     fs::File,
-    io::BufRead,
-    io::BufReader,
+    io::{BufRead, BufReader},
+    path::Path,
 };
 
 use crate::{FileDB, filedb_add};
@@ -111,24 +111,24 @@ pub extern "C" fn process_bin(fname: *const libc::c_char, bin_out: *const FileDB
 
 ///
 /// 4:top:fopen /proc/sys/kernel/osrelease:0x57b4d4d33540
-/// idX : bin_name : syscall file_name : val
+/// id_x : bin_name : syscall file_path : val
 #[derive(Debug, PartialEq)]
 struct Action {
-    idX: u32,
+    id_x: u32,
     bin_name: String,
     syscall: String,
-    file_name: String,
+    file_path: String,
     val: Option<i64>,
 }
 
 fn parse_action(line: String) -> Result<Action, ()> {
     let binding = line.split(':').collect::<Vec<_>>();
-    let [idX, bin_name, syscall_and_file_name, val_str] = binding.as_slice() else {
+    let [id_x, bin_name, syscall_and_file_path, val_str] = binding.as_slice() else {
         panic!("Invalid contents of the trace file.");
     };
 
-    let binding = syscall_and_file_name.split(' ').collect::<Vec<_>>();
-    let [syscall, file_name] = binding.as_slice() else {
+    let binding = syscall_and_file_path.split(' ').collect::<Vec<_>>();
+    let [syscall, file_path] = binding.as_slice() else {
         panic!("Invalid contents of the trace file.");
     };
 
@@ -137,26 +137,26 @@ fn parse_action(line: String) -> Result<Action, ()> {
         .ok();
 
     Ok(Action {
-        idX: idX.parse().unwrap(),
+        id_x: id_x.parse().unwrap(),
         bin_name: bin_name.to_string(),
         syscall: syscall.to_string(),
-        file_name: file_name.to_string(),
+        file_path: file_path.to_string(),
         val,
     })
 }
 
 fn bin_trace_match(action: &Action) -> bool {
     action.syscall == "exec"
-        && (action.file_name.starts_with("/bin/")
-            || action.file_name.starts_with("/sbin/")
-            || action.file_name.starts_with("/usr/bin/")
-            || action.file_name.starts_with("/usr/sbin/")
-            || action.file_name.starts_with("/usr/local/bin/")
-            || action.file_name.starts_with("/usr/local/sbin/")
-            || action.file_name.starts_with("/usr/games/")
-            || action.file_name.starts_with("/usr/local/games/"))
-        && !action.file_name.ends_with("/strace")
-        && !action.file_name.ends_with("/firejail")
+        && (action.file_path.starts_with("/bin/")
+            || action.file_path.starts_with("/sbin/")
+            || action.file_path.starts_with("/usr/bin/")
+            || action.file_path.starts_with("/usr/sbin/")
+            || action.file_path.starts_with("/usr/local/bin/")
+            || action.file_path.starts_with("/usr/local/sbin/")
+            || action.file_path.starts_with("/usr/games/")
+            || action.file_path.starts_with("/usr/local/games/"))
+        && !action.file_path.ends_with("/strace")
+        && !action.file_path.ends_with("/firejail")
 }
 
 /// Find access to binaries from firejail's trace file.
@@ -171,7 +171,13 @@ fn process_bin_from_trace_file(
         let line = line.expect("Must be valid line.");
         let action = parse_action(line).unwrap();
         if trace_match(&action) {
-            actions.push(action.file_name);
+            // a-la basename
+            let file_name = Path::new(&action.file_path)
+                .file_name()
+                .and_then(OsStr::to_str)
+                .unwrap()
+                .to_string();
+            actions.push(file_name);
         }
     }
     actions
@@ -179,6 +185,8 @@ fn process_bin_from_trace_file(
 
 #[cfg(test)]
 mod tests {
+    use crate::filedb_find;
+
     use super::*;
 
     #[test]
@@ -188,10 +196,10 @@ mod tests {
         assert!(parse_result.is_ok());
         assert_eq!(
             Action {
-                idX: 4,
+                id_x: 4,
                 bin_name: "top".to_owned(),
                 syscall: "fopen".to_owned(),
-                file_name: "/proc/sys/kernel/osrelease".to_owned(),
+                file_path: "/proc/sys/kernel/osrelease".to_owned(),
                 val: Some(0x57b4d4d33540),
             },
             parse_result.unwrap()
@@ -201,6 +209,24 @@ mod tests {
     #[test]
     fn parse_trace_file() {
         let v = process_bin_from_trace_file("testdata/firejail-trace.ZUVfMS", bin_trace_match);
-        assert_eq!(vec!["/usr/bin/top"], v);
+        assert_eq!(vec!["top"], v);
+    }
+
+    #[test]
+    fn test_process_bin() {
+        let file_db: *const FileDB = 0x1234 as *const FileDB;
+        process_bin(c"testdata/firejail-trace.ZUVfMS".as_ptr(), file_db);
+
+        let v = process_bin_from_trace_file("testdata/firejail-trace.ZUVfMS", bin_trace_match);
+        assert_eq!(vec!["top"], v);
+
+        for f in v {
+            assert!(
+                filedb_find(file_db, CString::new(f.as_bytes()).unwrap().as_ptr())
+                    != std::ptr::null(),
+                "{} was not found in the result of reference implementation.",
+                f
+            );
+        }
     }
 }

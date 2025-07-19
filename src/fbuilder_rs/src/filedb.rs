@@ -139,7 +139,7 @@ pub extern "C" fn filedb_find_old(
 pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -> *const FileDB {
     assert!(fname != std::ptr::null());
 
-    let mut dbs = FILEDBS.lock().unwrap();
+    let dbs = FILEDBS.lock().unwrap();
     if !dbs.contains_key(&(head as libc::uintptr_t)) {
         return std::ptr::null();
     }
@@ -259,7 +259,7 @@ pub extern "C" fn write_filedb_to_file_lines(
     prefix: *const char,
     fp: *mut libc::FILE,
 ) {
-    let mut dbs = FILEDBS.lock().unwrap();
+    let dbs = FILEDBS.lock().unwrap();
     if !dbs.contains_key(&(head as libc::uintptr_t)) {
         return;
     }
