@@ -1,5 +1,6 @@
 mod bin;
 mod filedb;
+mod trace;
 mod utils;
 
 pub use bin::*;
