@@ -256,7 +256,7 @@ pub extern "C" fn write_filedb_to_file_as_line(
 #[unsafe(no_mangle)]
 pub extern "C" fn write_filedb_to_file_lines(
     head: *const FileDB,
-    prefix: *const char,
+    prefix: *const libc::c_char,
     fp: *mut libc::FILE,
 ) {
     let dbs = FILEDBS.lock().unwrap();
