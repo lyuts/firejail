@@ -253,6 +253,23 @@ pub extern "C" fn write_filedb_to_file_as_line(
     }
 }
 
+pub fn write_vec_to_file_as_line(v: Vec<String>, sep: *const libc::c_char, fp: *mut libc::FILE) {
+    for s in v {
+        unsafe {
+            println!("WRITING {}", s);
+            libc::fprintf(
+                fp,
+                c"%s%s".as_ptr(),
+                CString::new(s.as_bytes()).unwrap().into_raw(),
+                sep,
+            );
+        }
+    }
+    unsafe {
+        libc::fprintf(fp, c"\n".as_ptr());
+    }
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn write_filedb_to_file_lines(
     head: *const FileDB,

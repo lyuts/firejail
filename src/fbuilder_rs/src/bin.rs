@@ -81,7 +81,13 @@ mod tests {
     #[test]
     fn test_process_bin() {
         let v = process_syscalls_from_trace_file("testdata/firejail-trace.ZUVfMS", bin_trace_match);
-        assert_eq!(vec!["/usr/bin/top"], v.iter().cloned().map(|a| a.file_path).collect::<Vec<String>>());
+        assert_eq!(
+            vec!["/usr/bin/top"],
+            v.iter()
+                .cloned()
+                .map(|a| a.file_path)
+                .collect::<Vec<String>>()
+        );
 
         // for f in v {
         //     assert!(

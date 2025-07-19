@@ -51,7 +51,8 @@ pub fn process_syscalls_from_trace_file(
         let line = line.expect("Must be valid line.");
         let action = parse_action(line).unwrap();
         if trace_match(&action) {
-            actions.push(action);
+            // why not push? to preserve the behavior of the original file db implementation.
+            actions.insert(0, action);
         }
     }
     actions
@@ -80,8 +81,15 @@ mod tests {
 
     #[test]
     fn parse_trace_file() {
-        let v = process_syscalls_from_trace_file("testdata/firejail-trace.ZUVfMS", |a| a.syscall == "exec");
-        assert_eq!(vec!["/usr/bin/top"], v.iter().cloned().map(|a| a.file_path).collect::<Vec<String>>());
+        let v = process_syscalls_from_trace_file("testdata/firejail-trace.ZUVfMS", |a| {
+            a.syscall == "exec"
+        });
+        assert_eq!(
+            vec!["/usr/bin/top"],
+            v.iter()
+                .cloned()
+                .map(|a| a.file_path)
+                .collect::<Vec<String>>()
+        );
     }
-
 }

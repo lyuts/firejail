@@ -124,48 +124,6 @@ static void process_files(const char *fname, const char *dir, void (*callback)(c
 }
 
 //*******************************************
-// etc directory
-//*******************************************
-static FileDB *etc_out = 0x0101;
-
-static void etc_callback(char *ptr) {
-	// skip firejail directory
-	if (strncmp(ptr, "/etc/firejail", 13) == 0)
-		return;
-
-	// extract the directory:
-	assert(strncmp(ptr, "/etc", 4) == 0);
-	ptr += 4;
-	if (*ptr != '/')
-		return;
-	ptr++;
-
-	if (*ptr == '/')	// double '/'
-		ptr++;
-	if (*ptr == '\0')
-		return;
-
-	// add only top files and directories
-	char *end = strchr(ptr, '/');
-	if (end)
-		*end = '\0';
-	filedb_add(etc_out, ptr);
-}
-
-void build_etc(const char *fname, FILE *fp) {
-	assert(fname);
-
-	process_files(fname, "/etc", etc_callback);
-
-	fprintf(fp, "private-etc ");
-	if (filedb_is_empty(etc_out))
-		fprintf(fp, "none\n");
-	else {
-        write_filedb_to_file_as_line(etc_out, ",", fp);
-	}
-}
-
-//*******************************************
 // var directory
 //*******************************************
 #if 0
