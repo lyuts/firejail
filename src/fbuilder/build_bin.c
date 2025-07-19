@@ -19,31 +19,3 @@
 */
 #include "fbuilder.h"
 
-static FileDB *bin_out = 0x0201;
-
-// process fname, fname.1, fname.2, fname.3, fname.4, fname.5
-void build_bin(const char *fname, FILE *fp) {
-	assert(fname);
-
-	// run fname
-	process_bin(fname, bin_out);
-
-	// run all the rest
-	struct stat s;
-	int i;
-	for (i = 1; i <= 5; i++) {
-		char *newname;
-		if (asprintf(&newname, "%s.%d", fname, i) == -1)
-			errExit("asprintf");
-		if (stat(newname, &s) == 0)
-			process_bin(newname, bin_out);
-		free(newname);
-	}
-
-	if (!filedb_is_empty(bin_out)) {
-        printf("[DBG] BINOUT:\n");
-		fprintf(fp, "private-bin ");
-        write_filedb_to_file_as_line(bin_out, ",", fp);
-		fprintf(fp, "\n");
-	}
-}

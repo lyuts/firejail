@@ -145,7 +145,7 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
     }
     let mut found = false;
 
-    let mut found_str = &String::new();
+    // let mut found_str = &String::new();
 
     for ptr_fname_str in dbs.get(&(head as libc::uintptr_t)).unwrap().iter() {
         unsafe {
@@ -159,7 +159,7 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
             ) == 0
             {
                 found = true;
-                found_str = ptr_fname_str;
+                // found_str = ptr_fname_str;
                 break;
             }
 
@@ -172,7 +172,7 @@ pub extern "C" fn filedb_find(head: *const FileDB, fname: *const libc::c_char) -
             // && libc::strncmp((*ptr).fname, fname, (*ptr).len) == 0
             {
                 found = true;
-                found_str = ptr_fname_str;
+                // found_str = ptr_fname_str;
                 break;
             }
         }
@@ -226,7 +226,7 @@ pub extern "C" fn filedb_print(
 #[unsafe(no_mangle)]
 pub extern "C" fn write_filedb_to_file_as_line(
     head: *const FileDB,
-    sep: *const char,
+    sep: *const libc::c_char,
     fp: *mut libc::FILE,
 ) {
     let dbs = FILEDBS.lock().unwrap();

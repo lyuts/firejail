@@ -5,24 +5,46 @@ use std::{
     path::Path,
 };
 
-use crate::{FileDB, filedb_add};
+use crate::{FileDB, filedb_add, filedb_is_empty, write_filedb_to_file_as_line};
 
-const MAX_BUF: i32 = 4096;
-
+/// Process trace file pointed to by fname, fname.1, fname.2, fname.3, fname.4, fname.5
 #[unsafe(no_mangle)]
-pub extern "C" fn process_bin(fname: *const libc::c_char, bin_out: *const FileDB) {
+pub extern "C" fn build_bin(fname: *const libc::c_char, fp: *mut libc::FILE) {
     assert!(fname != std::ptr::null());
+    let fname_r: String = unsafe { CStr::from_ptr(fname).to_str().unwrap().to_string() };
+    println!("[DBG] build_bin: fname = {}", fname_r);
 
-    unsafe {
-        let v =
-            process_bin_from_trace_file(CStr::from_ptr(fname).to_str().unwrap(), bin_trace_match);
+    let bin_out: *const FileDB = 0x0201 as *const FileDB;
+    // run fname
+    process_bin(fname_r.clone(), bin_out);
 
-        for f in v {
-            filedb_add(bin_out, CString::new(f.as_bytes()).unwrap().as_ptr());
+    // run all the rest
+    for i in 1..=5 {
+        let new_name_r: String = format!("{}.{}", fname_r, i);
+
+        if let Ok(mdata) = std::fs::metadata(&new_name_r) {
+            if mdata.is_file() {
+                process_bin(new_name_r, bin_out);
+            }
         }
     }
 
-    return;
+    unsafe {
+        if filedb_is_empty(bin_out) == 0 {
+            libc::fprintf(fp, c"private-bin ".as_ptr());
+            write_filedb_to_file_as_line(bin_out, c",".as_ptr(), fp);
+            libc::fprintf(fp, c"\n".as_ptr());
+        }
+    }
+}
+
+fn process_bin(fname: String, bin_out: *const FileDB) {
+    assert!(!fname.is_empty());
+
+    let v = process_bin_from_trace_file(&fname, bin_trace_match);
+    for f in v {
+        filedb_add(bin_out, CString::new(f.as_bytes()).unwrap().as_ptr());
+    }
 }
 
 ///
@@ -49,7 +71,7 @@ fn parse_action(line: String) -> Result<Action, ()> {
     };
 
     let val = i64::from_str_radix(val_str, 10)
-        .or_else(|s| i64::from_str_radix(&val_str[2..], 16))
+        .or_else(|_s| i64::from_str_radix(&val_str[2..], 16))
         .ok();
 
     Ok(Action {
@@ -131,7 +153,7 @@ mod tests {
     #[test]
     fn test_process_bin() {
         let file_db: *const FileDB = 0x1234 as *const FileDB;
-        process_bin(c"testdata/firejail-trace.ZUVfMS".as_ptr(), file_db);
+        process_bin("testdata/firejail-trace.ZUVfMS".to_owned(), file_db);
 
         let v = process_bin_from_trace_file("testdata/firejail-trace.ZUVfMS", bin_trace_match);
         assert_eq!(vec!["top"], v);

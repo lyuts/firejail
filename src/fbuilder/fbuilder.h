@@ -49,9 +49,6 @@ void build_share(const char *fname, FILE *fp);
 void build_run(const char *fname, FILE *fp);
 void build_runuser(const char *fname, FILE *fp);
 
-// build_bin.c
-void build_bin(const char *fname, FILE *fp);
-
 // build_home.c
 void build_home(const char *fname, FILE *fp);
 
